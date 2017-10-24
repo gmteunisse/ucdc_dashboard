@@ -20,23 +20,24 @@ awesome_package_loader <- function(package_vector){
 #Generates a donut plot for the distribution of "yes", "no" and "not available"
 plot_freq <- function(data, variable){
   
-  #Count occurrences and make ready for plotting
+  #Count occurrences and make ready for plotting. Not using table() function because not suitable.
   df <- data$total
-  tbl <- as.data.frame(table(df[[variable]], useNA = "always"), stringsAsFactors = F)
-  to_plot <- c("No", "Yes", "Not available")
-  if (nrow(tbl) != 3){ #find out which data is missing and add a 0
-    
-  }
-  tbl$Var1 <- factor(x = tbl$Var1,
-                     levels = c("Yes", "No", "Not available"),
-                     ordered = T)
+  tbl <- data.frame(Var1 = factor(x = c("Yes", "No", "Not available"),
+                                  levels = c("Yes", "No", "Not available"),
+                                  ordered = T),
+                    Freq = c(0, 0, 0))
+  tbl[1,2] <- sum(tolower(df[[variable]]) == "yes", na.rm = T)
+  tbl[2,2] <- sum(tolower(df[[variable]]) == "no", na.rm = T)
+  tbl[3,2] <- sum(is.na(df[[variable]]))
+  tbl$Freq[tbl$Freq == 0] <- NA
+  colors <- c(Yes = color_orange[3], No = color_blue[3], "Not available" = color_grey[3])
   
   #Create plot
   p <- ggplot(tbl, aes(x = "", y = Freq, fill = Var1, group = Var1)) +
     geom_bar(stat = "identity", width = 0.3) +
-    geom_text(aes(label = Freq), position = position_stack(vjust = 0.5), size = 2) +
+    geom_text(aes(label = Freq), position = position_stack(vjust = 0.5), size = 3) +
     coord_polar("y") +
-    scale_fill_manual(values = c(color_theme[1], color_blue[3], color_grey[3]) ) +
+    scale_fill_manual(values = colors) +
     plot_theme +
     theme(legend.title=element_blank(),
           axis.line.x = element_blank(),
@@ -50,7 +51,8 @@ plot_freq <- function(data, variable){
           strip.background = element_blank(),
           panel.grid.major.y = element_blank(),
           text = element_text(family = "Helvetica", size = 12),
-          legend.position = "top")
+          legend.position = "top",
+          legend.direction = "vertical")
   
   return(p)
   
@@ -84,7 +86,7 @@ plot_genera <- function(data, region){
     geom_bar(stat = "identity", position = "stack", width = 0.3) +
     coord_polar("y") +
     scale_fill_manual(values = color) +
-    geom_text(aes(label = Freq), position = position_stack(vjust = 0.5), size = 2) +
+    geom_text(aes(label = Freq), position = position_stack(vjust = 0.5), size = 3) +
     plot_theme +
     theme(legend.title=element_blank(),
           axis.line.x = element_blank(),
@@ -104,14 +106,122 @@ plot_genera <- function(data, region){
   return(p)
 }
 
-##### Session basic #####
+plot_assay_dot <- function(data, raw_tables, cols){
+  df <- raw_tables$total
+  df$Status <- "Filtered"
+  index <- which(df$Microorganism_ID %in% data$total$Microorganism_ID)
+  df$Status[index] <- "Selected"
+  df$Status <- factor(x = df$Status, levels = c("Selected", "Filtered"), ordered = T)
+  df <- subset(x = df, select = c("Microorganism_ID", "Status", cols))
+  df.long <- melt(df, id.vars = c("Microorganism_ID", "Status"))
+  colors <- c(color_blue[3], color_grey[3])
+  set.seed(1)
+  p <- ggplot(df.long, aes(x = variable,
+                           y = value, 
+                           color = Status, 
+                           group = Status,
+                           label = Microorganism_ID)) +
+    #geom_point() +
+    geom_jitter(width = 0.1, height = 0) +
+    scale_y_continuous(limits = c(0, 100),
+                       expand = c(0, 0), 
+                       labels = function(x){paste(x, "%", sep = "")}) + 
+    scale_color_manual(values = colors) +
+    plot_theme +
+    theme(
+      axis.line.y = element_blank(),
+      axis.title.y=element_blank(),
+      axis.ticks.y=element_blank(),
+      axis.title.x=element_blank(),
+      legend.position="none"
+    )
+  p <- ggplotly(p, tooltip = c("label", "value"))
+  return(p)
+
+}
+
+plot_assay_hist <- function(data, cols){
+  
+  df <- subset(x = data$total, select = c("Microorganism_ID", cols))
+  df.long <- melt(df, id.vars = c("Microorganism_ID"))
+  p <- ggplot(df.long, aes(value, fill = variable, group = variable)) +
+    geom_histogram(bins = 50, position = "dodge", center = 1) +
+    scale_x_continuous(limits = c(-2, 100), labels = function(x){paste(x, "%", sep = "")}) +
+    scale_y_continuous(expand = c(0, 0)) + 
+    scale_fill_manual(values = color_blue[3]) +
+    plot_theme +
+    theme(
+      axis.line.y = element_blank(),
+      axis.title.y=element_blank(),
+      axis.ticks.y=element_blank(),
+      axis.title.x=element_blank(),
+      legend.position="none"
+    )
+    
+  return(p)
+}
+
+#Generates a donut plot for the distribution of human pathogenicity levels
+plot_path <- function(data){
+  
+  #Count occurrences and make ready for plotting. Not using table() function because not suitable.
+  df <- data$total
+  tbl <- data.frame(Var1 = factor(x = c(1, 2, 3, 4, "Not available"),
+                                  levels = c(1, 2, 3, 4, "Not available"),
+                                  ordered = T),
+                    Freq = c(0, 0, 0, 0, 0))
+  tbl[1,2] <- sum(df[["Pathogen_class"]] == "1", na.rm = T)
+  tbl[2,2] <- sum(df[["Pathogen_class"]] == "2", na.rm = T)
+  tbl[3,2] <- sum(df[["Pathogen_class"]] == "3", na.rm = T)
+  tbl[4,2] <- sum(df[["Pathogen_class"]] == "4", na.rm = T)
+  tbl[5,2] <- sum(is.na(df[["Pathogen_class"]]))
+  tbl$Freq[tbl$Freq == 0] <- NA
+  colors <- c("1" = color_blue[3], 
+              "2" = color_orange[3],
+              "3" = color_orange[2],
+              "4" = color_orange[1],
+              "Not available" = color_grey[3])
+  
+  #Create plot
+  p <- ggplot(tbl, aes(x = "", y = Freq, fill = Var1, group = Var1)) +
+    geom_bar(stat = "identity", width = 0.3) +
+    geom_text(aes(label = Freq), position = position_stack(vjust = 0.5), size = 3) +
+    coord_polar("y") +
+    scale_fill_manual(values = colors) +
+    plot_theme +
+    theme(legend.title=element_blank(),
+          axis.line.x = element_blank(),
+          axis.line.y = element_blank(),
+          axis.title.x=element_blank(),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank(),
+          axis.title.y=element_blank(),
+          axis.text.y=element_blank(),
+          axis.ticks.y=element_blank(),
+          strip.background = element_blank(),
+          panel.grid.major.y = element_blank(),
+          text = element_text(family = "Helvetica", size = 12),
+          legend.position = "top",
+          legend.direction = "vertical")
+  
+  return(p)
+  
+}
+
+##### Session basics #####
 
 #Load packages
-awesome_package_loader(c("shiny", "shinydashboard", "readxl", "dplyr", "ggplot2", "plotly"))
+awesome_package_loader(c("shiny", 
+                         "shinydashboard",
+                         "readxl", 
+                         "dplyr", 
+                         "ggplot2", 
+                         "plotly", 
+                         "reshape2",
+                         "scales"))
 
 #Define plot styling
 #Set colors
-color_theme <- c("#ff7256", "#c1c1c1", "#b3ecec")
 color_blue <- c("#3c598e", "#5077bd", "#6495ed", "#83aaf0", "#a2bff4")
 color_orange <- c("#994433", "#cc5b44", "#ff7256", "#ff8e77", "#ffaa99")
 color_tan <- c("#8e703c", "#bd9650", "#edbc64", "#f0c983", "#f4d6a2")
@@ -228,41 +338,199 @@ ui <- dashboardPage(
   
   dashboardBody(
     tabItems(
-      #Display each data table in its own tab.
+      #### UI: Overview ####
       tabItem(tabName = "overview",
+              #Boxes with values
               fluidRow(
                 valueBoxOutput(outputId = "samples_selected"),
                 valueBoxOutput(outputId = "bact_selected"),
                 valueBoxOutput(outputId = "fungi_selected")
               ),
-              
+              #Genera distributions
               fluidRow(
                 box(
                   title = "16S amplified genera",
                   solidHeader = T,
                   collapsible = T,
-                  plotOutput("donut_bact"), 
-                  height = 500
+                  plotOutput("donut_bact", height = 300L), 
+                  width = 6
                 ),
                 box(
                   title = "ITS amplified genera",
                   solidHeader = T,
                   collapsible = T,
-                  plotOutput("donut_fungi"),
-                  height = 500
+                  plotOutput("donut_fungi", height = 300L),
+                  width = 6
+                )
+              ),
+              #Distributions of pathogenicity and PGP
+              fluidRow(
+                box(
+                  title = "Plant pathogen",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotOutput("donut_plant_path", height = 200L),
+                  width = 2
                 ),
-                fluidRow(
-                  box(
-                    title = "Plant pathogen",
-                    solidHeader = T,
-                    collapsible = T,
-                    plotOutput("donut_plant_path"),
-                    height = 500
-                  )
+                box(
+                  title = "Human pathogen",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotOutput("donut_human_path", height = 200L), 
+                  width = 2
+                ),
+                box(
+                  title = "PGP activity: PA",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotOutput("donut_PA", height = 200L), 
+                  width = 2
+                ),
+                box(
+                  title = "PGP activity: PS",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotOutput("donut_PS", height = 200L), 
+                  width = 2
+                ),
+                box(
+                  title = "PGP activity: SF",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotOutput("donut_SF", height = 200L), 
+                  width = 2
+                ),
+                box(
+                  title = "PGP activity: FN",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotOutput("donut_FN", height = 200L), 
+                  width = 2
+                )
+              ),
+              fluidRow(
+                box(
+                  title = "Inhibition: Pse",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotOutput("hist_Pse", height = 100L),
+                  width = 3
+                ),
+                box(
+                  title = "Inhibition: Xa",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotOutput("hist_Xa", height = 100L),
+                  width = 3
+                ),
+                box(
+                  title = "Inhibition: Agr",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotOutput("hist_Agr", height = 100L),
+                  width = 3
+                ),
+                box(
+                  title = "Inhibition: Pe",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotOutput("hist_Pe", height = 100L),
+                  width = 3
+                ),
+                box(
+                  title = "Inhibition: Bo",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotOutput("hist_Bo", height = 100L),
+                  width = 3
+                ),
+                box(
+                  title = "Inhibition: Mo",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotOutput("hist_Mo", height = 100L),
+                  width = 3
+                ),
+                box(
+                  title = "Inhibition: Geo",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotOutput("hist_Geo", height = 100L),
+                  width = 3
+                ),
+                box(
+                  title = "Inhibition: Fu",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotOutput("hist_Fu", height = 100L),
+                  width = 3
                 )
               )
       ),
-      tabItem(tabName = "assays"),
+      #### UI: Assays ####
+      tabItem(tabName = "assays",
+              fluidRow(
+                box(
+                  title = "Inhibition: Pse",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotlyOutput("dot_Pse", height = 300L), 
+                  width = 3
+                  ),
+                box(
+                  title = "Inhibition: Xa",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotlyOutput("dot_Xa", height = 300L), 
+                  width = 3
+                  ),
+                box(
+                  title = "Inhibition: Agr",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotlyOutput("dot_Agr", height = 300L),  
+                  width = 3
+                  ),
+                box(
+                  title = "Inhibition: Pe",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotlyOutput("dot_Pe", height = 300L),  
+                  width = 3
+                  )
+                ),
+              fluidRow(
+                box(
+                  title = "Inhibition: Bo",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotlyOutput("dot_Bo", height = 300L), 
+                  width = 3
+                ),
+                box(
+                  title = "Inhibition: Mo",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotlyOutput("dot_Mo", height = 300L), 
+                  width = 3
+                ),
+                box(
+                  title = "Inhibition: Geo",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotlyOutput("dot_Geo", height = 300L),  
+                  width = 3
+                ),
+                box(
+                  title = "Inhibition: Fu",
+                  solidHeader = T,
+                  collapsible = T,
+                  plotlyOutput("dot_Fu", height = 300L),  
+                  width = 3
+                )
+              )
+              ),
+      #### UI: Explore ####
       tabItem(tabName = "exlore"),
       tabItem(tabName = "tables",
               fluidRow(
@@ -301,6 +569,8 @@ ui <- dashboardPage(
   )
 )
 
+##### Shiny server #####
+
 #Define the shiny server
 server <- function(input, output) {
   
@@ -331,6 +601,10 @@ server <- function(input, output) {
                                  sheet = 5,
                                  trim_ws = T,
                                  skip = 1))
+    tables$total <-full_join(tables$assays, tables$literature)
+    tables$total <- full_join(tables$total, tables$taxonomy)
+    tables$total <- left_join(tables$total, tables$isolation)
+    tables$total <- left_join(tables$total, tables$samples)
     return(tables)
   })
   
@@ -394,7 +668,7 @@ server <- function(input, output) {
   
   ##### Render graphs and tables #####
   
-  ### Overview Tab
+  #### Overview Tab ####
   
   #ValueBox: number of samples selected
   output$samples_selected <- renderValueBox({
@@ -489,7 +763,284 @@ server <- function(input, output) {
     
   })
   
-  ### Tables tab
+  #Plot: human pathogenicity
+  output$donut_human_path <- renderPlot({
+    
+    #Prevent errors from showing uo
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Generate the plot
+    p <- plot_path(data())
+    p
+    
+  })
+  
+  #Plot: PA pgp activity
+  output$donut_PA <- renderPlot({
+    
+    #Prevent errors from showing uo
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Generate the plot
+    p <- plot_freq(data(), "PA")
+    p
+    
+  })
+  
+  #Plot: PS pgp activity
+  output$donut_PS <- renderPlot({
+    
+    #Prevent errors from showing uo
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Generate the plot
+    p <- plot_freq(data(), "PS")
+    p
+    
+  })
+  
+  #Plot: SF pgp activity
+  output$donut_SF <- renderPlot({
+    
+    #Prevent errors from showing uo
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Generate the plot
+    p <- plot_freq(data(), "SF")
+    p
+    
+  })
+  
+  #Plot: FN pgp activity
+  output$donut_FN <- renderPlot({
+    
+    #Prevent errors from showing uo
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Generate the plot
+    p <- plot_freq(data(), "FN")
+    p
+    
+  })
+  
+  #Plot: Anti-Pse activity
+  output$hist_Pse <- renderPlot({
+    
+    #Prevent errors from showing up
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Generate the plot
+    p <- plot_assay_hist(data(), c("Pse"))
+    p
+    
+  })
+  
+  #Plot: Anti-Xa activity
+  output$hist_Xa <- renderPlot({
+    
+    #Prevent errors from showing up
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Generate the plot
+    p <- plot_assay_hist(data(), c("Xa"))
+    p
+    
+  })
+  
+  #Plot: Anti-Agr activity
+  output$hist_Agr <- renderPlot({
+    
+    #Prevent errors from showing up
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Generate the plot
+    p <- plot_assay_hist(data(), c("Agr"))
+    p
+    
+  })
+  
+  #Plot: Anti-Pe activity
+  output$hist_Pe <- renderPlot({
+    
+    #Prevent errors from showing up
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Generate the plot
+    p <- plot_assay_hist(data(), c("Pe"))
+    p
+    
+  })
+  
+  #Plot: Anti-Bo activity
+  output$hist_Bo <- renderPlot({
+    
+    #Prevent errors from showing up
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Generate the plot
+    p <- plot_assay_hist(data(), c("Bo"))
+    p
+    
+  })
+  
+  #Plot: Anti-Mo activity
+  output$hist_Mo <- renderPlot({
+    
+    #Prevent errors from showing up
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Generate the plot
+    p <- plot_assay_hist(data(), c("Mo"))
+    p
+    
+  })
+  
+  #Plot: Anti-Geo activity
+  output$hist_Geo <- renderPlot({
+    
+    #Prevent errors from showing up
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Generate the plot
+    p <- plot_assay_hist(data(), c("Geo"))
+    p
+    
+  })
+  
+  #Plot: Anti-Fu activity
+  output$hist_Fu <- renderPlot({
+    
+    #Prevent errors from showing up
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Generate the plot
+    p <- plot_assay_hist(data(), c("Fu"))
+    p
+    
+  })
+  
+  #### Assays Tab ####
+  output$dot_Pse <- renderPlotly({
+    #Prevent errors from showing up
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Render the plot
+    p <- plot_assay_dot(data(), raw_tables(), c("Pse"))
+    p
+    
+  })
+  
+  output$dot_Xa <- renderPlotly({
+    #Prevent errors from showing up
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Render the plot
+    p <- plot_assay_dot(data(), raw_tables(), c("Xa"))
+    p
+    
+  })
+  
+  output$dot_Agr <- renderPlotly({
+    #Prevent errors from showing up
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Render the plot
+    p <- plot_assay_dot(data(), raw_tables(), c("Agr"))
+    p
+    
+  })
+  
+  output$dot_Pe <- renderPlotly({
+    #Prevent errors from showing up
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Render the plot
+    p <- plot_assay_dot(data(), raw_tables(), c("Pe"))
+    p
+    
+  })
+  
+  output$dot_Bo <- renderPlotly({
+    #Prevent errors from showing up
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Render the plot
+    p <- plot_assay_dot(data(), raw_tables(), c("Bo"))
+    p
+    
+  })
+  
+  output$dot_Mo <- renderPlotly({
+    #Prevent errors from showing up
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Render the plot
+    p <- plot_assay_dot(data(), raw_tables(), c("Mo"))
+    p
+    
+  })
+  
+  output$dot_Geo <- renderPlotly({
+    #Prevent errors from showing up
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Render the plot
+    p <- plot_assay_dot(data(), raw_tables(), c("Geo"))
+    p
+    
+  })
+  
+  output$dot_Fu <- renderPlotly({
+    #Prevent errors from showing up
+    if(is.null(data())){
+      return(NULL)
+    }
+    
+    #Render the plot
+    p <- plot_assay_dot(data(), raw_tables(), c("Fu"))
+    
+  })
+  #### Tables tab ####
   #Render the data tables
   output$table_samples <- renderDataTable(
     {as.data.frame(data()$samples)}
