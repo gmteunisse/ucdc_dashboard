@@ -5,18 +5,39 @@
 
 ##### Session basics #####
 
-#Load functions
-source("Dependencies/functions.R")
+#Load the required packages
+require(shiny)
+require(shinydashboard)
+require(readxl)
+require(dplyr)
+require(ggplot2)
+require(plotly)
+require(reshape2)
+require(scales)
+require(gridExtra)
 
-#Load packages
-awesome_package_loader(c("shiny", 
-                         "shinydashboard",
-                         "readxl", 
-                         "dplyr", 
-                         "ggplot2", 
-                         "plotly", 
-                         "reshape2",
-                         "scales"))
+#Load functions
+#source("www/functions.R")
+
+#Load the UI components
+source("www/ui_sidebar.R")
+source("www/ui_body_overview.R")
+source("www/ui_body_assays.R")
+source("www/ui_body_explore.R")
+source("www/ui_body_assays.R")
+source("www/ui_body_tables.R")
+source("www/ui_body.R")
+
+#Load the server components
+source("www/server_data.R")
+source("www/server_overview_boxes.R")
+source("www/server_overview_genera.R")
+source("www/server_overview_donuts.R")
+source("www/server_overview_histograms.R")
+source("www/server_overview_scatterplots.R")
+source("www/server_assays_heatmap.R")
+source("www/server_explore_cat_cat.R")
+source("www/server_explore_cat_con.R")
 
 #Define plot styling
 #Set colors

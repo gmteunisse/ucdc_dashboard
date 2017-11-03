@@ -1,0 +1,12 @@
+name: dashboard
+title: dashboard
+username:
+account: ucdc
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 230663
+bundleId: 1057915
+url: https://ucdc.shinyapps.io/dashboard/
+when: 1509723477.3021
+asMultiple: FALSE
+asStatic: FALSE
